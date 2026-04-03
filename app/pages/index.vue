@@ -287,7 +287,7 @@ onUnmounted(() => {
 
     <!-- 侧边栏 -->
     <aside
-      class="fixed top-0 left-0 h-full bg-white transition-all duration-300 z-20"
+      class="fixed top-0 left-0 h-full bg-white transition-all duration-1000 z-20"
       :class="[
         sidebarCollapsed ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100 w-72'
       ]"
@@ -385,17 +385,20 @@ onUnmounted(() => {
       ]"
     >
       <!-- 顶部输入区域 -->
-      <div class="relative">
+      <div class="relative overflow-hidden transition-all duration-500" :class="{ 'max-h-0': inputCollapsed, 'pb-4': !inputCollapsed }">
         <!-- 折叠按钮 -->
         <button
           v-if="content && !loading && !error"
           @click="toggleInputCollapse"
-          class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-white border border-slate-200 rounded-full w-8 h-8 flex items-center justify-center shadow-sm hover:bg-slate-50 transition"
+          class="z-10 bg-white border border-slate-200 rounded-full w-8 h-8 flex items-center justify-center shadow-sm hover:bg-slate-50 transition"
+          :class="[
+            inputCollapsed ? 'fixed top-1 left-1/2 transform -translate-x-1/2' : 'absolute -bottom-0 left-1/2 transform -translate-x-1/2'
+          ]"
           :aria-label="inputCollapsed ? '展开输入区' : '收起输入区'"
         >
           <svg
             class="w-4 h-4 text-slate-500 transition-transform"
-            :class="{ 'rotate-180': inputCollapsed }"
+            :class="{ 'rotate-180': !inputCollapsed }"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -406,8 +409,8 @@ onUnmounted(() => {
 
         <!-- 输入区域内容 -->
         <div
-          class="max-w-4xl mx-auto px-4 pt-16 pb-8 transition-all duration-300"
-          :class="{ 'h-0 opacity-0 overflow-hidden py-0': inputCollapsed }"
+          class="max-w-4xl mx-auto px-4 pt-16 pb-8 transition-all duration-500 max-h-[1000px]"
+          :class="{ 'max-h-0 opacity-0 overflow-hidden pt-0 pb-0': inputCollapsed }"
         >
           <div class="text-center mb-12">
             <h1 class="text-4xl font-bold text-slate-800 mb-3">
@@ -452,7 +455,7 @@ onUnmounted(() => {
       </div>
 
       <!-- 内容区域 -->
-      <div class="pb-16 px-4">
+      <div class="pb-16 px-4 pt-9">
         <!-- 错误提示 -->
         <div
           v-if="error"
