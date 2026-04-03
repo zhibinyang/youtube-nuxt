@@ -305,278 +305,288 @@ onUnmounted(() => {
 
 <template>
   <div class="min-h-screen bg-white">
-    <!-- 侧边栏切换按钮 - 悬浮在左上角，位置靠下 -->
-    <button
-      @click="toggleSidebar"
-      class="fixed top-12 left-4 z-30 p-2 rounded hover:bg-slate-100 transition-colors"
-      :aria-label="sidebarCollapsed ? '展开目录' : '收起目录'"
-    >
-      <svg v-if="sidebarCollapsed" class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-      <svg v-else class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-      </svg>
-    </button>
+    <!-- 顶部输入区域 - 全宽显示 -->
+    <div class="relative overflow-hidden transition-all duration-500" :class="{ 'max-h-0': inputCollapsed, 'pb-4': !inputCollapsed }">
+      <!-- 折叠按钮 -->
+      <button
+        v-if="content && !loading && !error"
+        @click="toggleInputCollapse"
+        class="z-10 bg-white border border-slate-200 rounded-full w-8 h-8 flex items-center justify-center shadow-sm hover:bg-slate-50 transition"
+        :class="[
+          inputCollapsed ? 'fixed top-1 left-1/2 transform -translate-x-1/2' : 'absolute -bottom-0 left-1/2 transform -translate-x-1/2'
+        ]"
+        :aria-label="inputCollapsed ? '展开输入区' : '收起输入区'"
+      >
+        <svg
+          class="w-4 h-4 text-slate-500 transition-transform"
+          :class="{ 'rotate-180': !inputCollapsed }"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
 
-    <!-- 侧边栏 -->
-    <aside
-      class="fixed top-0 left-0 h-full bg-white transition-all duration-1000 z-20"
-      :class="[
-        sidebarCollapsed ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100 w-72'
-      ]"
-    >
-      <div class="h-full flex flex-col pt-20">
-        <!-- 目录内容 -->
-        <div class="flex-1 overflow-y-auto px-4 pb-8" style="scrollbar-width: thin">
-          <ul class="space-y-1">
-            <!-- 递归渲染目录树 -->
-            <template v-for="item in structuredToc" :key="item.id">
-              <!-- 1级标题 -->
-              <li
-                class="cursor-pointer rounded transition-colors"
-                :class="[
-                  'toc-item-level-1',
-                  activeTocId === item.id ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900',
-                  'pl-2'
-                ]"
-              >
-                <div
-                  class="flex items-center gap-1 py-1 px-2"
-                  @click="scrollToHeading(item.id)"
-                >
-                  <span class="truncate flex-1">
-                    {{ item.text }}
-                  </span>
-                </div>
+      <!-- 输入区域内容 -->
+      <div
+        class="max-w-4xl mx-auto px-4 pt-16 pb-8 transition-all duration-500 max-h-[1000px]"
+        :class="{ 'max-h-0 opacity-0 overflow-hidden pt-0 pb-0': inputCollapsed }"
+      >
+        <div class="text-center mb-12">
+          <h1 class="text-4xl font-bold text-slate-800 mb-3">
+            YouTube 字幕智能整理
+          </h1>
+          <p class="text-slate-500">
+            输入含字幕的 YouTube 链接，AI 将生成结构化的对话文章
+          </p>
+        </div>
 
-                <!-- 2级子标题 -->
-                <ul v-if="item.children && item.children.length > 0" class="space-y-1">
-                  <li
-                    v-for="child2 in item.children"
-                    :key="child2.id"
-                    class="cursor-pointer rounded transition-colors relative group"
-                    :class="[
-                      'toc-item-level-2',
-                      activeTocId === child2.id ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'
-                    ]"
-                  >
-                    <div
-                      class="flex items-center gap-1 py-1 px-2"
-                    >
-                      <!-- 2级标题折叠按钮 -->
-                      <span
-                        class="text-[14px] text-slate-400 transition-all absolute left-[-4px] opacity-0 group-hover:opacity-100 p-1 cursor-pointer hover:text-slate-700"
-                        :class="{
-                          '-rotate-90': child2.collapsed,
-                          'opacity-100': child2.collapsed
-                        }"
-                        @click.stop="toggleTocItemOnly(child2)"
-                      >
-                        ▾
-                      </span>
-                      <span
-                        class="truncate flex-1"
-                        @click="scrollToHeading(child2.id)"
-                      >
-                        {{ child2.text }}
-                      </span>
-                    </div>
+        <!-- 输入框 -->
+        <div class="flex gap-3 max-w-3xl mx-auto">
+          <input
+            v-model="url"
+            type="text"
+            placeholder="https://www.youtube.com/watch?v=..."
+            class="flex-1 px-4 py-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+            :disabled="loading"
+            @keyup.enter="handleSubmit"
+          />
+          <button
+            @click="handleSubmit"
+            :disabled="loading || (!url.trim() && !useMock)"
+            class="px-6 py-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition"
+          >
+            {{ loading ? '处理中...' : '分析' }}
+          </button>
+        </div>
 
-                    <!-- 3级子标题 -->
-                    <ul
-                      v-if="child2.children && child2.children.length > 0 && !child2.collapsed"
-                      class="space-y-1 pl-4"
-                    >
-                      <li
-                        v-for="child3 in child2.children"
-                        :key="child3.id"
-                        class="toc-item-level-3 text-sm rounded transition-colors cursor-pointer py-1 px-2"
-                        :class="[
-                          activeTocId === child3.id ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'
-                        ]"
-                        @click="scrollToHeading(child3.id)"
-                      >
-                        <span class="block truncate">
-                          {{ child3.text }}
-                        </span>
-                      </li>
-                    </ul>
-                  </li>
-                </ul>
-              </li>
-            </template>
-          </ul>
+        <!-- 调试选项 -->
+        <div class="max-w-3xl mx-auto mt-3 flex items-center justify-end">
+          <label class="flex items-center gap-2 text-sm text-slate-500 cursor-pointer">
+            <input
+              v-model="useMock"
+              type="checkbox"
+              class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            使用模拟数据（调试前端）
+          </label>
         </div>
       </div>
-    </aside>
+    </div>
 
-    <!-- 主内容 -->
-    <main
-      class="transition-all duration-300"
-      :class="[
-        sidebarCollapsed ? 'ml-0' : 'ml-72'
-      ]"
-    >
-      <!-- 顶部输入区域 -->
-      <div class="relative overflow-hidden transition-all duration-500" :class="{ 'max-h-0': inputCollapsed, 'pb-4': !inputCollapsed }">
-        <!-- 折叠按钮 -->
+    <!-- 下半部分：目录 + 正文 -->
+    <div class="flex">
+      <!-- 侧边栏目录 - 只在下半部分显示 -->
+      <aside
+        class="sticky top-4 h-[calc(100vh-2rem)] shrink-0 bg-white transition-all duration-300 overflow-hidden"
+        :class="[
+          sidebarCollapsed ? 'w-0 opacity-0' : 'w-72 opacity-100 ml-4'
+        ]"
+      >
+        <!-- 目录切换按钮 -->
         <button
-          v-if="content && !loading && !error"
-          @click="toggleInputCollapse"
-          class="z-10 bg-white border border-slate-200 rounded-full w-8 h-8 flex items-center justify-center shadow-sm hover:bg-slate-50 transition"
-          :class="[
-            inputCollapsed ? 'fixed top-1 left-1/2 transform -translate-x-1/2' : 'absolute -bottom-0 left-1/2 transform -translate-x-1/2'
-          ]"
-          :aria-label="inputCollapsed ? '展开输入区' : '收起输入区'"
+          @click="toggleSidebar"
+          class="absolute top-0 left-4 z-10 p-2 rounded hover:bg-slate-100 transition-colors"
+          :aria-label="sidebarCollapsed ? '展开目录' : '收起目录'"
         >
-          <svg
-            class="w-4 h-4 text-slate-500 transition-transform"
-            :class="{ 'rotate-180': !inputCollapsed }"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          <svg v-if="sidebarCollapsed" class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          <svg v-else class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
 
-        <!-- 输入区域内容 -->
-        <div
-          class="max-w-4xl mx-auto px-4 pt-16 pb-8 transition-all duration-500 max-h-[1000px]"
-          :class="{ 'max-h-0 opacity-0 overflow-hidden pt-0 pb-0': inputCollapsed }"
-        >
-          <div class="text-center mb-12">
-            <h1 class="text-4xl font-bold text-slate-800 mb-3">
-              YouTube 字幕智能整理
-            </h1>
-            <p class="text-slate-500">
-              输入含字幕的 YouTube 链接，AI 将生成结构化的对话文章
-            </p>
-          </div>
+        <div class="h-full flex flex-col pt-12">
+          <!-- 目录内容 -->
+          <div class="flex-1 overflow-y-auto px-4 pb-8" style="scrollbar-width: thin">
+            <ul class="space-y-1">
+              <!-- 递归渲染目录树 -->
+              <template v-for="item in structuredToc" :key="item.id">
+                <!-- 1级标题 -->
+                <li
+                  class="cursor-pointer rounded transition-colors"
+                  :class="[
+                    'toc-item-level-1',
+                    activeTocId === item.id ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900',
+                    'pl-2'
+                  ]"
+                >
+                  <div
+                    class="flex items-center gap-1 py-1 px-2"
+                    @click="scrollToHeading(item.id)"
+                  >
+                    <span class="truncate flex-1">
+                      {{ item.text }}
+                    </span>
+                  </div>
 
-          <!-- 输入框 -->
-          <div class="flex gap-3 max-w-3xl mx-auto">
-            <input
-              v-model="url"
-              type="text"
-              placeholder="https://www.youtube.com/watch?v=..."
-              class="flex-1 px-4 py-3 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-              :disabled="loading"
-              @keyup.enter="handleSubmit"
-            />
-            <button
-              @click="handleSubmit"
-              :disabled="loading || (!url.trim() && !useMock)"
-              class="px-6 py-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition"
-            >
-              {{ loading ? '处理中...' : '分析' }}
-            </button>
-          </div>
+                  <!-- 2级子标题 -->
+                  <ul v-if="item.children && item.children.length > 0" class="space-y-1">
+                    <li
+                      v-for="child2 in item.children"
+                      :key="child2.id"
+                      class="cursor-pointer rounded transition-colors relative group"
+                      :class="[
+                        'toc-item-level-2',
+                        activeTocId === child2.id ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'
+                      ]"
+                    >
+                      <div
+                        class="flex items-center gap-1 py-1 px-2"
+                      >
+                        <!-- 2级标题折叠按钮 -->
+                        <span
+                          class="text-[14px] text-slate-400 transition-all absolute left-[-4px] opacity-0 group-hover:opacity-100 p-1 cursor-pointer hover:text-slate-700"
+                          :class="{
+                            '-rotate-90': child2.collapsed,
+                            'opacity-100': child2.collapsed
+                          }"
+                          @click.stop="toggleTocItemOnly(child2)"
+                        >
+                          ▾
+                        </span>
+                        <span
+                          class="truncate flex-1"
+                          @click="scrollToHeading(child2.id)"
+                        >
+                          {{ child2.text }}
+                        </span>
+                      </div>
 
-          <!-- 调试选项 -->
-          <div class="max-w-3xl mx-auto mt-3 flex items-center justify-end">
-            <label class="flex items-center gap-2 text-sm text-slate-500 cursor-pointer">
-              <input
-                v-model="useMock"
-                type="checkbox"
-                class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-              />
-              使用模拟数据（调试前端）
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- 内容区域 -->
-      <div class="pb-16 px-4 pt-9">
-        <!-- 错误提示 -->
-        <div
-          v-if="error"
-          class="max-w-3xl mx-auto mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700"
-        >
-          {{ error }}
-        </div>
-
-        <!-- 骨架加载 -->
-        <div v-if="loading" class="max-w-3xl mx-auto animate-pulse">
-          <!-- 标题骨架 -->
-          <div class="h-10 bg-slate-200 rounded w-3/4 mb-8"></div>
-
-          <!-- 段落骨架 -->
-          <div class="space-y-3 mb-10">
-            <div class="h-4 bg-slate-200 rounded w-full"></div>
-            <div class="h-4 bg-slate-200 rounded w-11/12"></div>
-            <div class="h-4 bg-slate-200 rounded w-4/5"></div>
-          </div>
-
-          <!-- 二级标题骨架 -->
-          <div class="h-7 bg-slate-200 rounded w-1/2 mb-4"></div>
-
-          <!-- 段落骨架 -->
-          <div class="space-y-3 mb-10">
-            <div class="h-4 bg-slate-200 rounded w-full"></div>
-            <div class="h-4 bg-slate-200 rounded w-5/6"></div>
-            <div class="h-4 bg-slate-200 rounded w-3/4"></div>
-            <div class="h-4 bg-slate-200 rounded w-2/3"></div>
-          </div>
-
-          <!-- 二级标题骨架 -->
-          <div class="h-7 bg-slate-200 rounded w-2/5 mb-4"></div>
-
-          <!-- 段落骨架 -->
-          <div class="space-y-3">
-            <div class="h-4 bg-slate-200 rounded w-full"></div>
-            <div class="h-4 bg-slate-200 rounded w-9/10"></div>
-            <div class="h-4 bg-slate-200 rounded w-5/6"></div>
+                      <!-- 3级子标题 -->
+                      <ul
+                        v-if="child2.children && child2.children.length > 0 && !child2.collapsed"
+                        class="space-y-1 pl-4"
+                      >
+                        <li
+                          v-for="child3 in child2.children"
+                          :key="child3.id"
+                          class="toc-item-level-3 text-sm rounded transition-colors cursor-pointer py-1 px-2"
+                          :class="[
+                            activeTocId === child3.id ? 'text-blue-600' : 'text-slate-600 hover:text-slate-900'
+                          ]"
+                          @click="scrollToHeading(child3.id)"
+                        >
+                          <span class="block truncate">
+                            {{ child3.text }}
+                          </span>
+                        </li>
+                      </ul>
+                    </li>
+                  </ul>
+                </li>
+              </template>
+            </ul>
           </div>
         </div>
+      </aside>
 
-        <!-- AI 输出内容 -->
-        <div
-          v-if="content"
-          ref="contentRef"
-          class="prose prose-slate lg:prose-lg mx-auto custom-prose"
-          v-html="renderedHtml"
-        />
-
-        <!-- 空状态 -->
-        <div
-          v-if="!content && !loading && !error"
-          class="max-w-3xl mx-auto text-center py-12"
+      <!-- 主内容区域 -->
+      <main class="flex-1 min-w-0">
+        <!-- 目录切换按钮 - 当目录收起时显示在左上角 -->
+        <button
+          v-if="sidebarCollapsed && content"
+          @click="toggleSidebar"
+          class="sticky top-4 left-4 z-10 p-2 rounded bg-white border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors mb-4"
+          :aria-label="sidebarCollapsed ? '展开目录' : '收起目录'"
         >
-          <div class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
-            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
+          <svg class="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
+        <!-- 内容区域 -->
+        <div class="pb-16 px-4 pt-4">
+          <!-- 错误提示 -->
+          <div
+            v-if="error"
+            class="max-w-3xl mx-auto mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700"
+          >
+            {{ error }}
+          </div>
+
+          <!-- 骨架加载 -->
+          <div v-if="loading" class="max-w-3xl mx-auto animate-pulse">
+            <!-- 标题骨架 -->
+            <div class="h-10 bg-slate-200 rounded w-3/4 mb-8"></div>
+
+            <!-- 段落骨架 -->
+            <div class="space-y-3 mb-10">
+              <div class="h-4 bg-slate-200 rounded w-full"></div>
+              <div class="h-4 bg-slate-200 rounded w-11/12"></div>
+              <div class="h-4 bg-slate-200 rounded w-4/5"></div>
             </div>
-            <h3 class="text-xl font-semibold text-slate-800 mb-3">输入 YouTube 链接开始分析</h3>
-            <p class="text-slate-500 mb-6">
-              系统会自动提取字幕，整理为结构化的对话文章
-            </p>
-            <div class="grid grid-cols-2 gap-4 max-w-md mx-auto text-left">
-              <div class="p-4 bg-slate-50 rounded-lg">
-                <div class="text-blue-500 mb-2 font-medium">🎬 字幕提取</div>
-                <p class="text-sm text-slate-600">自动识别并提取 YouTube 视频字幕</p>
+
+            <!-- 二级标题骨架 -->
+            <div class="h-7 bg-slate-200 rounded w-1/2 mb-4"></div>
+
+            <!-- 段落骨架 -->
+            <div class="space-y-3 mb-10">
+              <div class="h-4 bg-slate-200 rounded w-full"></div>
+              <div class="h-4 bg-slate-200 rounded w-5/6"></div>
+              <div class="h-4 bg-slate-200 rounded w-3/4"></div>
+              <div class="h-4 bg-slate-200 rounded w-2/3"></div>
+            </div>
+
+            <!-- 二级标题骨架 -->
+            <div class="h-7 bg-slate-200 rounded w-2/5 mb-4"></div>
+
+            <!-- 段落骨架 -->
+            <div class="space-y-3">
+              <div class="h-4 bg-slate-200 rounded w-full"></div>
+              <div class="h-4 bg-slate-200 rounded w-9/10"></div>
+              <div class="h-4 bg-slate-200 rounded w-5/6"></div>
+            </div>
+          </div>
+
+          <!-- AI 输出内容 -->
+          <div
+            v-if="content"
+            ref="contentRef"
+            class="prose prose-slate lg:prose-lg mx-auto custom-prose"
+            v-html="renderedHtml"
+          />
+
+          <!-- 空状态 -->
+          <div
+            v-if="!content && !loading && !error"
+            class="max-w-3xl mx-auto text-center py-12"
+          >
+            <div class="bg-white rounded-xl p-8 border border-slate-200 shadow-sm">
+              <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
               </div>
-              <div class="p-4 bg-slate-50 rounded-lg">
-                <div class="text-blue-500 mb-2 font-medium">🤖 AI 整理</div>
-                <p class="text-sm text-slate-600">智能整理为排版精美的文章</p>
-              </div>
-              <div class="p-4 bg-slate-50 rounded-lg">
-                <div class="text-blue-500 mb-2 font-medium">⚡ 流式输出</div>
-                <p class="text-sm text-slate-600">实时打字机效果，无需等待</p>
-              </div>
-              <div class="p-4 bg-slate-50 rounded-lg">
-                <div class="text-blue-500 mb-2 font-medium">📑 目录导航</div>
-                <p class="text-sm text-slate-600">自动生成目录，点击快速跳转</p>
+              <h3 class="text-xl font-semibold text-slate-800 mb-3">输入 YouTube 链接开始分析</h3>
+              <p class="text-slate-500 mb-6">
+                系统会自动提取字幕，整理为结构化的对话文章
+              </p>
+              <div class="grid grid-cols-2 gap-4 max-w-md mx-auto text-left">
+                <div class="p-4 bg-slate-50 rounded-lg">
+                  <div class="text-blue-500 mb-2 font-medium">🎬 字幕提取</div>
+                  <p class="text-sm text-slate-600">自动识别并提取 YouTube 视频字幕</p>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg">
+                  <div class="text-blue-500 mb-2 font-medium">🤖 AI 整理</div>
+                  <p class="text-sm text-slate-600">智能整理为排版精美的文章</p>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg">
+                  <div class="text-blue-500 mb-2 font-medium">⚡ 流式输出</div>
+                  <p class="text-sm text-slate-600">实时打字机效果，无需等待</p>
+                </div>
+                <div class="p-4 bg-slate-50 rounded-lg">
+                  <div class="text-blue-500 mb-2 font-medium">📑 目录导航</div>
+                  <p class="text-sm text-slate-600">自动生成目录，点击快速跳转</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   </div>
 </template>
 
@@ -741,7 +751,7 @@ aside::after {
   right: 0;
   transform: translateY(-50%);
   width: 1px;
-  height: 80%;
+  height: 90%;
   background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.1), transparent);
 }
 </style>
