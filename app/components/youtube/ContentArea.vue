@@ -4,6 +4,7 @@ const props = defineProps<{
   loading: boolean
   error: string
   renderedHtml: string
+  streaming: boolean
 }>()
 
 const emit = defineEmits<{
@@ -35,7 +36,7 @@ defineExpose({
       />
       <!-- 复制全文按钮 - hover 可见 -->
       <button
-        v-if="content"
+        v-if="content && !streaming"
         @click="emit('copy')"
         class="absolute bottom-0 left-0 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm hover:bg-slate-50 transition-opacity opacity-0 group-hover:opacity-100 flex items-center gap-2 text-sm text-slate-600 z-10"
       >

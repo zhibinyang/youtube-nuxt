@@ -114,13 +114,14 @@ const handleToggleInput = () => {
 
       <!-- 主内容区域 -->
       <main class="flex-1 min-w-0">
-        <!-- 目录切换按钮 - 当目录收起时显示在左上角 -->
-        <youtube-sidebar-toggle-button
-          v-if="sidebarCollapsed && content && showExternalToggle"
-          :collapsed="sidebarCollapsed"
-          class="sticky top-6 z-10 mb-4 ml-6 xl:ml-2"
-          @toggle="toggleSidebar"
-        />
+        <!-- 目录切换按钮 - 浮动在左上角，不占文档流空间 -->
+        <div class="sticky top-6 z-10 h-0 ml-6 xl:ml-2">
+          <youtube-sidebar-toggle-button
+            v-if="sidebarCollapsed && content && showExternalToggle"
+            :collapsed="sidebarCollapsed"
+            @toggle="toggleSidebar"
+          />
+        </div>
 
         <youtube-content-area
           ref="contentAreaRef"
@@ -128,6 +129,7 @@ const handleToggleInput = () => {
           :loading="loading"
           :error="error"
           :rendered-html="renderedHtml"
+          :streaming="isStreaming"
           @copy="handleCopy"
         />
       </main>
