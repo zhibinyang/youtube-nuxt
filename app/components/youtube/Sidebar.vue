@@ -10,6 +10,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   toggleItem: [item: TocItem]
   navigateTo: [id: string]
+  close: []
 }>()
 
 /** 切换目录项折叠 */
@@ -21,6 +22,17 @@ const toggleTocItemOnly = (item: TocItem) => {
 </script>
 
 <template>
+  <!-- 遮罩层：仅在窄屏 (<xl) 且 sidebar 展开时显示，点击关闭 sidebar -->
+  <Teleport to="body">
+    <Transition name="backdrop">
+      <div
+        v-if="!collapsed"
+        class="fixed inset-0 bg-black/20 z-10 xl:hidden"
+        @click="emit('close')"
+      />
+    </Transition>
+  </Teleport>
+
   <aside
     class="h-[calc(100vh-2rem)] bg-white transition-all duration-300 overflow-hidden z-20"
     :class="[
@@ -35,7 +47,7 @@ const toggleTocItemOnly = (item: TocItem) => {
     <div class="h-full flex flex-col">
       <!-- 目录切换按钮 -->
       <div class="p-2 border-b border-slate-100">
-        <Slot name="toggle-button" />
+        <slot name="toggle-button" />
       </div>
 
       <!-- 目录内容 -->
@@ -134,5 +146,18 @@ aside::after {
   width: 1px;
   height: 90%;
   background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.1), transparent);
+}
+</style>
+
+<!-- 遮罩过渡动画（非 scoped，Teleport 到 body 的元素不受 scoped 限制） -->
+<style>
+.backdrop-enter-active,
+.backdrop-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.backdrop-enter-from,
+.backdrop-leave-to {
+  opacity: 0;
 }
 </style>

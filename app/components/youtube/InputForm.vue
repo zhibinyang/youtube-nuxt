@@ -11,6 +11,10 @@ const emit = defineEmits<{
   submit: []
 }>()
 
+const inputRef = ref<HTMLInputElement | null>(null)
+
+defineExpose({ inputRef })
+
 const handleKeyupEnter = () => {
   emit('submit')
 }
@@ -30,6 +34,7 @@ const handleKeyupEnter = () => {
     <!-- 输入框 -->
     <div class="flex gap-3 max-w-3xl mx-auto">
       <input
+        ref="inputRef"
         :value="modelValue"
         @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
         type="text"

@@ -1,16 +1,18 @@
-# YouTube 字幕总结工具
+# YouTube 字幕智能整理工具
 
-基于 Nuxt 4 + Gemini AI 的 YouTube 视频字幕智能总结工具，提供飞书文档风格的阅读体验。
+基于 Nuxt 4 + Google Gemini AI 构建的效率工具，自动提取 YouTube 视频字幕，智能整理为结构清晰、排版精美的中文采访稿，提供飞书文档风格的阅读体验。
 
 ## 功能特性
 
-- 🎬 **YouTube 字幕自动提取**: 支持所有公开 YouTube 视频的字幕提取
-- 🤖 **AI 智能整理**: 调用 Gemini AI 将字幕内容整理为结构化的 Markdown 文章
+- 🎬 **YouTube 字幕自动提取**: 支持所有带公开字幕的 YouTube 视频字幕提取
+- 🧠 **AI 智能整理**: 基于 Gemini 大模型，先生成全局大纲再分块生成内容，长视频处理更稳定，结构更清晰
+- 👥 **多角色自动识别**: 自动识别主持人、嘉宾身份，支持单人独白/双人访谈/多人圆桌等多种场景，正确标注说话人
 - ⚡ **流式输出**: 打字机效果实时展示 AI 生成内容，无需等待完整响应
-- 📑 **飞书风格界面**: 左侧可折叠目录，支持多级标题导航
-- 🔖 **标题折叠**: 支持二级标题折叠/展开，方便长内容阅读
-- 🎨 **零自定义 CSS**: 基于 TailwindCSS + @tailwindcss/typography 实现精美排版
-- ☁️ **Cloudflare 部署**: 完全兼容 Cloudflare Pages 无服务器部署
+- 📑 **多级目录导航**: 左侧自动生成可折叠目录，支持1-3级标题快速跳转
+- 🔖 **多级标题折叠**: 二级/三级标题均支持点击折叠/展开，方便长内容阅读
+- 📋 **一键复制导出**: hover正文左下角显示复制按钮，一键导出完整Markdown格式内容
+- 🎨 **精美排版**: 基于 TailwindCSS + @tailwindcss/typography 实现专业采访稿排版
+- ☁️ **Cloudflare 兼容**: 完全适配 Cloudflare Pages 无服务器部署，无需运维
 
 ## 技术栈
 
@@ -80,29 +82,32 @@ npx wrangler pages deploy dist
 
 ```
 ├── app/
-│   └── pages/
-│       └── index.vue          # 主页面组件
+│   ├── pages/
+│   │   └── index.vue          # 主应用页面，包含完整前端逻辑
+│   ├── components/youtube/    # 业务UI组件
+│   ├── composables/           # 可复用组合式函数（滚动同步、响应式侧边栏等）
+│   └── types/                 # TypeScript 类型定义
 ├── server/
 │   ├── api/
-│   │   ├── analyze.post.ts    # 正式 API 路由
-│   │   └── mock-analyze.post.ts # 调试用 Mock API
+│   │   ├── analyze.post.ts    # 核心分析接口：字幕提取→大纲生成→分块生成全流程
+│   │   └── mock-analyze.post.ts # 调试用模拟接口，用于前端功能测试
 │   └── utils/
-│       ├── youtube.ts         # YouTube 字幕提取工具
-│       └── gemini.ts          # Gemini API 封装
-├── scripts/
-│   └── test-transcript.ts     # 字幕提取测试脚本
-├── nuxt.config.ts             # Nuxt 配置
-├── tailwind.config.js         # Tailwind 配置
+│       ├── youtube.ts         # YouTube 字幕提取封装，支持带ID的分片格式
+│       └── gemini.ts          # Gemini AI 封装：大纲生成+分块内容生成逻辑
+├── nuxt.config.ts             # Nuxt 配置，已预设 Cloudflare Pages 部署配置
+├── tailwind.config.js         # Tailwind CSS 配置
 └── .env.example               # 环境变量示例
 ```
 
 ## 使用说明
 
-1. 在输入框中粘贴 YouTube 视频链接
-2. 点击「分析」按钮
-3. 等待字幕提取和 AI 整理完成
-4. 使用左侧目录导航，点击标题可快速跳转
-5. 鼠标悬停在二级标题上可看到折叠按钮，点击可折叠/展开该部分内容
+1. 在输入框中粘贴带字幕的 YouTube 视频链接
+2. 点击「分析」按钮，系统自动提取字幕并开始AI整理
+3. 生成过程中可实时查看流式输出的内容，无需等待全部完成
+4. 生成完成后：
+   - 使用左侧目录导航，点击标题可快速跳转到对应位置
+   - 点击二级/三级标题可折叠/展开对应内容
+   - 鼠标hover到正文左下角，点击「复制全文」按钮可一键导出完整Markdown内容
 
 ## 调试模式
 

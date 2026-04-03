@@ -3,6 +3,7 @@ import { marked } from 'marked'
 
 /**
  * Markdown 处理和目录生成逻辑
+ * 负责：Markdown → HTML 渲染、TOC 提取、标题折叠 DOM 操作
  */
 export const useMarkdownProcessor = (content: Ref<string>) => {
   /** 目录列表 */
@@ -33,8 +34,8 @@ export const useMarkdownProcessor = (content: Ref<string>) => {
     let index = 0
 
     while ((match = headingRegex.exec(content.value)) !== null) {
-      const level = match[1].length
-      const text = match[2].trim()
+      const level = match[1]!.length
+      const text = match[2]!.trim()
       const id = generateHeadingId(level, text, index++)
 
       newToc.push({ id, level, text, collapsed: false })
@@ -52,14 +53,14 @@ export const useMarkdownProcessor = (content: Ref<string>) => {
       const newItem = { ...item, children: [] }
 
       // 弹出栈中级别 >= 当前级别的项
-      while (stack.length > 0 && stack[stack.length - 1].level >= item.level) {
+      while (stack.length > 0 && stack[stack.length - 1]!.level >= item.level) {
         stack.pop()
       }
 
       if (stack.length === 0) {
         tree.push(newItem)
       } else {
-        stack[stack.length - 1].children!.push(newItem)
+        stack[stack.length - 1]!.children!.push(newItem)
       }
 
       stack.push(newItem)
@@ -71,12 +72,14 @@ export const useMarkdownProcessor = (content: Ref<string>) => {
   /** 渲染 Markdown 为 HTML */
   const renderedHtml = computed(() => {
     if (!content.value) return ''
-    // 直接渲染，不使用自定义 renderer
     return marked(content.value) as string
   })
 
-  /** 初始化标题折叠功能 */
-  const initHeadingFolding = async (contentRef: Ref<HTMLElement | null>) => {
+  /**
+   * 初始化标题的 ID 和折叠功能
+   * 给 DOM 中的 h1-h6 添加 ID，给 h2/h3 添加点击折叠交互
+   */
+  const initHeadingInteractions = async (contentRef: Ref<HTMLElement | null>) => {
     if (!contentRef.value) return
 
     await nextTick()
@@ -89,30 +92,60 @@ export const useMarkdownProcessor = (content: Ref<string>) => {
       heading.id = id
       heading.classList.add('scroll-mt-4')
 
-      // 给2级和3级标题添加点击折叠功能
+      // 给2级标题添加点击折叠功能
       if (level === 2) {
-        heading.style.cursor = 'pointer'
-        heading.onclick = () => {
+        ;(heading as HTMLElement).style.cursor = 'pointer'
+        ;(heading as HTMLElement).onclick = () => {
+          const isCollapsing = !heading.classList.contains('collapsed')
           heading.classList.toggle('collapsed')
+
+          // 遍历后面的所有兄弟元素，直到遇到下一个 h2 或 h1
+          let next = heading.nextElementSibling
+          while (next) {
+            if (next.tagName === 'H2' || next.tagName === 'H1') break
+            ;(next as HTMLElement).style.display = isCollapsing ? 'none' : ''
+            next = next.nextElementSibling
+          }
+
           // 同步更新目录的折叠状态
           const tocItem = toc.value.find(item => item.id === id)
           if (tocItem && tocItem.level === 2) {
-            tocItem.collapsed = heading.classList.contains('collapsed')
+            tocItem.collapsed = isCollapsing
           }
         }
       }
+
+      // 给3级标题添加点击折叠功能
       if (level === 3) {
-        heading.style.cursor = 'pointer'
-        heading.onclick = () => {
+        ;(heading as HTMLElement).style.cursor = 'pointer'
+        ;(heading as HTMLElement).onclick = () => {
+          const isCollapsing = !heading.classList.contains('collapsed')
           heading.classList.toggle('collapsed')
-          // 3级标题不同步到目录折叠状态
+
+          // 遍历后面的所有兄弟元素，直到遇到下一个 h3/h2/h1
+          let next = heading.nextElementSibling
+          while (next) {
+            if (next.tagName === 'H3' || next.tagName === 'H2' || next.tagName === 'H1') break
+            ;(next as HTMLElement).style.display = isCollapsing ? 'none' : ''
+            next = next.nextElementSibling
+          }
         }
       }
     })
   }
 
-  // 内容变化时更新目录和标题折叠
-  watch(() => content.value, async () => {
+  /** 切换目录项折叠（仅目录 UI，不同步到正文 DOM） */
+  const toggleTocItemOnly = (item: TocItem) => {
+    if (item.level === 2) {
+      const originalItem = toc.value.find(t => t.id === item.id)
+      if (originalItem && originalItem.level === 2) {
+        originalItem.collapsed = !originalItem.collapsed
+      }
+    }
+  }
+
+  // 内容变化时自动更新目录
+  watch(() => content.value, () => {
     updateTocFromMarkdown()
   }, { deep: true })
 
@@ -123,6 +156,7 @@ export const useMarkdownProcessor = (content: Ref<string>) => {
     renderedHtml,
     generateHeadingId,
     updateTocFromMarkdown,
-    initHeadingFolding
+    initHeadingInteractions,
+    toggleTocItemOnly
   }
 }
