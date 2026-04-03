@@ -191,19 +191,49 @@ watch(() => content.value, async () => {
     if (level === 2) {
       heading.style.cursor = 'pointer'
       heading.onclick = () => {
+        const isCollapsing = !heading.classList.contains('collapsed')
         heading.classList.toggle('collapsed')
+
+        // 遍历后面的所有兄弟元素，直到遇到下一个h2或h1
+        let next = heading.nextElementSibling
+        while (next) {
+          if (next.tagName === 'H2' || next.tagName === 'H1') {
+            break
+          }
+          if (isCollapsing) {
+            next.style.display = 'none'
+          } else {
+            next.style.display = ''
+          }
+          next = next.nextElementSibling
+        }
+
         // 同步更新目录的折叠状态
         const tocItem = toc.value.find(item => item.id === id)
         if (tocItem && tocItem.level === 2) {
-          tocItem.collapsed = heading.classList.contains('collapsed')
+          tocItem.collapsed = isCollapsing
         }
       }
     }
     if (level === 3) {
       heading.style.cursor = 'pointer'
       heading.onclick = () => {
+        const isCollapsing = !heading.classList.contains('collapsed')
         heading.classList.toggle('collapsed')
-        // 3级标题不同步到目录折叠状态
+
+        // 遍历后面的所有兄弟元素，直到遇到下一个h3/h2/h1
+        let next = heading.nextElementSibling
+        while (next) {
+          if (next.tagName === 'H3' || next.tagName === 'H2' || next.tagName === 'H1') {
+            break
+          }
+          if (isCollapsing) {
+            next.style.display = 'none'
+          } else {
+            next.style.display = ''
+          }
+          next = next.nextElementSibling
+        }
       }
     }
   })
@@ -291,6 +321,32 @@ const isProgrammaticScroll = ref(false)
 /** 切换输入区域折叠 */
 function toggleInputCollapse() {
   inputCollapsed.value = !inputCollapsed.value
+}
+
+/** 复制全文到剪贴板 */
+async function copyContent() {
+  try {
+    await navigator.clipboard.writeText(content.value)
+    // 显示复制成功提示
+    const toast = document.createElement('div')
+    toast.textContent = '已复制到剪贴板'
+    toast.className = 'fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-black/90 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm'
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      toast.style.opacity = '0'
+      toast.style.transition = 'opacity 0.3s'
+      setTimeout(() => toast.remove(), 300)
+    }, 2000)
+  } catch (err) {
+    console.error('复制失败:', err)
+    // 降级方案：选中内容让用户手动复制
+    const selection = window.getSelection()
+    const range = document.createRange()
+    range.selectNode(contentRef.value!)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    alert('已选中全文，请手动复制')
+  }
 }
 
 // 监听滚动事件
@@ -542,12 +598,25 @@ onUnmounted(() => {
           </div>
 
           <!-- AI 输出内容 -->
-          <div
-            v-if="content"
-            ref="contentRef"
-            class="prose prose-slate lg:prose-lg mx-auto custom-prose"
-            v-html="renderedHtml"
-          />
+          <div class="relative group max-w-3xl mx-auto">
+            <div
+              v-if="content"
+              ref="contentRef"
+              class="prose prose-slate lg:prose-lg mx-auto custom-prose pb-12"
+              v-html="renderedHtml"
+            />
+            <!-- 复制全文按钮 - hover可见 -->
+            <button
+              v-if="content"
+              @click="copyContent"
+              class="absolute bottom-0 left-0 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm hover:bg-slate-50 transition-opacity opacity-0 group-hover:opacity-100 flex items-center gap-2 text-sm text-slate-600 z-10"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              复制全文
+            </button>
+          </div>
 
           <!-- 空状态 -->
           <div
@@ -702,31 +771,7 @@ html {
   opacity: 1;
 }
 
-/* 折叠时隐藏内容：隐藏h2之后所有元素直到下一个h2或h1 */
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-.custom-prose h2.collapsed + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) + *:not(:is(h2, h1)) { display: none !important; }
-
-/* 折叠时隐藏内容：隐藏h3之后所有元素直到下一个h3/h2/h1 */
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) { display: none !important; }
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) { display: none !important; }
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) { display: none !important; }
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) { display: none !important; }
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) { display: none !important; }
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) { display: none !important; }
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) { display: none !important; }
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) { display: none !important; }
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) { display: none !important; }
-.custom-prose h3.collapsed + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) + *:not(:is(h3, h2, h1)) { display: none !important; }
+/* 折叠逻辑现在由JS控制，CSS规则不再需要 */
 
 /* 目录样式 */
 .toc-item-level-1 {
