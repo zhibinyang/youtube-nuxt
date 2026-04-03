@@ -34,5 +34,5 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: youtube-subtitles # 确保这与你在 Cloudflare 创建的项目名一致
-          directory: .output/public      # ✅ 修复：Nuxt Cloudflare 预设的正确输出目录
+          directory: dist
           branch: main

@@ -3,6 +3,9 @@
  * 使用 youtube-transcript 库提取字幕
  */
 
+// @ts-ignore: bypass type error for deep file import to fix module resolution issue
+import { fetchTranscript } from 'youtube-transcript/dist/youtube-transcript.esm.js'
+
 /** 字幕响应类型 */
 interface TranscriptItem {
   text: string
@@ -35,10 +38,6 @@ export async function getYouTubeSubtitlesWithId(videoUrl: string): Promise<{
   if (!videoId) {
     throw new Error('Invalid YouTube URL format')
   }
-
-  // 动态导入 youtube-transcript ESM 版本
-  const module = await import('youtube-transcript/dist/youtube-transcript.esm.js')
-  const fetchTranscript = module.fetchTranscript
 
   // 使用 youtube-transcript 获取字幕
   const transcript = await fetchTranscript(videoId, {

@@ -21,7 +21,8 @@ async function main() {
   console.log(`视频 ID: ${videoId}\n`)
 
   try {
-    // 动态导入 ESM 模块
+    // 静态导入 ESM 模块
+    // @ts-ignore
     const { fetchTranscript } = await import('youtube-transcript/dist/youtube-transcript.esm.js')
 
     const transcript = await fetchTranscript(videoId, { lang: 'en' })
