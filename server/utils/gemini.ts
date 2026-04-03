@@ -4,32 +4,8 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
-
-/** System Prompt：定义输出格式 */
-const SYSTEM_PROMPT = `你是一位专业的对话内容整理专家。你的任务是将 YouTube 视频的字幕文本整理为结构清晰、排版精美的中文对话文章。
-
-## 输出要求
-
-1. **标题**：使用一级标题概括视频主题
-2. **摘要**：用 2-3 句话总结视频核心内容
-3. **正文**：按逻辑段落组织内容，使用恰当的二级标题分隔
-4. **格式**：使用 Markdown 格式，确保排版清晰
-
-## 排版规范
-
-- 使用 \`##\` 划分主要章节
-- 使用 \`**粗体**\` 强调关键概念
-- 使用 \`-\` 列表罗列要点
-- 使用 \`>\` 引用框突出重要观点
-- 适当使用代码块展示技术内容
-
-## 语言风格
-
-- 使用流畅自然的中文
-- 保留专业术语的英文原文（括号标注）
-- 确保逻辑连贯、易于阅读
-
-请直接输出整理后的 Markdown 内容，不要添加任何前言或说明。`
+/** 直接导入提示词，适配Cloudflare无文件系统环境，修改prompt.ts即可调整提示词 */
+import SYSTEM_PROMPT from './prompt'
 
 /**
  * 创建 Gemini 流式生成器
@@ -45,17 +21,39 @@ export async function* createGeminiStream(
 
   const model = genAI.getGenerativeModel({
     model: 'gemini-3.1-flash-lite-preview',
-    systemInstruction: SYSTEM_PROMPT
+    systemInstruction: SYSTEM_PROMPT,
+    generationConfig: {
+      maxOutputTokens: 65536 // 最大输出64k token
+    }
   })
+
+  // 打印完整的Gemini输入
+  console.log('='.repeat(80))
+  console.log('📤 发送给Gemini的原始输入：')
+  console.log('='.repeat(80))
+  console.log('[System Prompt]\n', SYSTEM_PROMPT)
+  console.log('\n' + '='.repeat(80))
+  console.log('[User Content (字幕内容)]\n', content)
+  console.log('='.repeat(80))
 
   const result = await model.generateContentStream(content)
 
+  // 拼接完整的响应内容
+  let fullResponse = ''
   for await (const chunk of result.stream) {
     const text = chunk.text()
     if (text) {
+      fullResponse += text
       yield text
     }
   }
+
+  // 全部输出完成后打印完整结果
+  console.log('='.repeat(80))
+  console.log('📥 Gemini完整输出结果：')
+  console.log('='.repeat(80))
+  console.log(fullResponse)
+  console.log('='.repeat(80))
 }
 
 /**

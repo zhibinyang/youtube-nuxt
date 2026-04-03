@@ -46,3 +46,4 @@ coverage
 
 # Additional Folders
 screenshots
+.playwright-mcp

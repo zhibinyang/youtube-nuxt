@@ -52,6 +52,14 @@ export default defineEventHandler(async (event) => {
       statusMessage: 'Subtitles too short or empty'
     })
   }
+  // 最大输入限制为1M字符
+  const MAX_INPUT_LENGTH = 1024 * 1024 // 1MB
+  if (subtitles.length > MAX_INPUT_LENGTH) {
+    throw createError({
+      statusCode: 422,
+      statusMessage: `Subtitles too long (max 1M characters, current ${Math.round(subtitles.length/1024)}KB)`
+    })
+  }
 
   // 5. 获取 API Key
   const apiKey = process.env.GEMINI_API_KEY
