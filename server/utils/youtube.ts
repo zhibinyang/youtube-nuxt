@@ -17,6 +17,19 @@ interface TranscriptItem {
  * @returns 字幕纯文本内容
  */
 export async function getYouTubeSubtitles(videoUrl: string): Promise<string> {
+  const { formattedText } = await getYouTubeSubtitlesWithId(videoUrl)
+  return formattedText
+}
+
+/**
+ * 从 YouTube 视频链接获取带ID编号的分片字幕
+ * @param videoUrl YouTube 视频链接
+ * @returns 带ID的格式化字幕文本 + 原始分片数组
+ */
+export async function getYouTubeSubtitlesWithId(videoUrl: string): Promise<{
+  rawChunks: TranscriptItem[]
+  formattedText: string
+}> {
   // 提取视频 ID
   const videoId = extractVideoId(videoUrl)
   if (!videoId) {
@@ -36,13 +49,16 @@ export async function getYouTubeSubtitles(videoUrl: string): Promise<string> {
     throw new Error('No captions available for this video')
   }
 
-  // 拼接所有文本
-  const content = transcript
-    .map((item) => item.text)
+  // 生成带ID编号的格式化文本
+  const formattedText = transcript
+    .map((item, index) => `[ID:${index + 1}] ${item.text}`) // ID从1开始
     .filter(Boolean)
     .join(' ')
 
-  return content
+  return {
+    rawChunks: transcript,
+    formattedText
+  }
 }
 
 /** 从 YouTube URL 中提取视频 ID */
