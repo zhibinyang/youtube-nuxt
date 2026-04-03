@@ -61,7 +61,7 @@ const handleKeyupEnter = () => {
           type="checkbox"
           class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
         />
-        使用模拟数据（调试前端）
+        使用模拟数据
       </label>
     </div>
   </div>

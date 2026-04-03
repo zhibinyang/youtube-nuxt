@@ -47,7 +47,6 @@ defineExpose({
       </button>
     </div>
 
-    <!-- 空状态 -->
-    <youtube-empty-state v-if="!content && !loading && !error" />
+    <!-- 空状态已移除 -->
   </div>
 </template>

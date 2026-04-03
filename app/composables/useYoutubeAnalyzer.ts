@@ -90,12 +90,19 @@ export const useYoutubeAnalyzer = () => {
         throw new Error('无法获取响应流')
       }
 
-      // 开始流式传输时自动折叠输入区并隐藏骨架屏
-      inputCollapsed.value = true
-      loading.value = false
+      let isFirstChunk = true
 
       while (true) {
         const { done, value } = await reader.read()
+
+        // 注意：在 Cloudflare 中，fetch 会在响应头返回时瞬间 resolve，而真正的流数据可能要等待几秒（大纲生成）。
+        // 因此必须在读到第一个 Chunk 后才关闭 loading 和隐藏空状态，否则骨架屏会闪退并重新显示介绍框。
+        if (isFirstChunk) {
+          isFirstChunk = false
+          inputCollapsed.value = true
+          loading.value = false
+        }
+
         if (done) break
 
         const chunk = decoder.decode(value, { stream: true })
