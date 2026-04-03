@@ -1,15 +1,15 @@
 /**
  * YouTube 分析核心业务逻辑
- * 管理输入状态、API 调用、流式接收和剪贴板操作
+ * 管理输入状态、API 调用、流式平滑输出和剪贴板操作
  */
 export const useYoutubeAnalyzer = () => {
   /** 输入的 YouTube URL */
   const url = ref('')
   /** 调试模式 - 使用 mock 接口 */
   const useMock = ref(false)
-  /** 生成的 Markdown 内容 */
+  /** 生成的 Markdown 内容（由 smoother 逐字写入） */
   const content = ref('')
-  /** 加载状态 */
+  /** 加载状态（骨架屏） */
   const loading = ref(false)
   /** 错误信息 */
   const error = ref('')
@@ -19,8 +19,45 @@ export const useYoutubeAnalyzer = () => {
   const autoScroll = ref(true)
   /** 标记是否是程序自动滚动，避免触发用户滚动检测 */
   const isProgrammaticScroll = ref(false)
-  /** 是否正在流式接收内容 */
-  const isStreaming = ref(false)
+
+  // ---- 流式输出平滑器 ----
+  const smoother = useStreamSmoother(content)
+  /** 是否正在流式输出（smoother 活跃期间一直为 true，含段间等待和排空阶段） */
+  const isStreaming = computed(() => smoother.isActive.value)
+
+  // ---- rAF 平滑滚动 ----
+  let scrollRafId: number | null = null
+
+  const startSmoothScroll = () => {
+    const tick = () => {
+      if (!autoScroll.value || !isStreaming.value) {
+        scrollRafId = null
+        return
+      }
+
+      const target = document.documentElement.scrollHeight - window.innerHeight
+      const current = window.scrollY
+      const distance = target - current
+
+      if (distance > 1) {
+        isProgrammaticScroll.value = true
+        // lerp: 每帧移动剩余距离的 12%，产生丝滑减速效果
+        window.scrollTo(0, current + distance * 0.12)
+      }
+
+      scrollRafId = requestAnimationFrame(tick)
+    }
+    if (!scrollRafId) {
+      scrollRafId = requestAnimationFrame(tick)
+    }
+  }
+
+  // 当 isStreaming 变化时自动控制滚动
+  watch(isStreaming, (streaming) => {
+    if (streaming && autoScroll.value) {
+      startSmoothScroll()
+    }
+  })
 
   /** 处理提交 - 直接使用内部响应式状态 */
   const handleSubmit = async () => {
@@ -29,7 +66,7 @@ export const useYoutubeAnalyzer = () => {
     loading.value = true
     error.value = ''
     content.value = ''
-    // 每次新分析开始时重置自动滚动状态
+    smoother.reset()
     autoScroll.value = true
 
     try {
@@ -55,30 +92,22 @@ export const useYoutubeAnalyzer = () => {
       // 开始流式传输时自动折叠输入区并隐藏骨架屏
       inputCollapsed.value = true
       loading.value = false
-      isStreaming.value = true
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
         const chunk = decoder.decode(value, { stream: true })
-        content.value += chunk
-
-        // 自动滚动到底部
-        if (autoScroll.value) {
-          isProgrammaticScroll.value = true
-          // 流式输出时使用即时滚动，避免平滑滚动的节流导致跟不上速度
-          window.scrollTo({
-            top: document.documentElement.scrollHeight,
-            behavior: 'auto'
-          })
-        }
+        smoother.push(chunk) // 进入缓冲区，由 smoother 匀速输出到 content
       }
+
+      // 上游流结束，通知 smoother 排空剩余缓冲
+      smoother.finish()
     } catch (e) {
       error.value = e instanceof Error ? e.message : '发生未知错误'
+      smoother.finish() // 出错也排空已缓冲的内容
     } finally {
       loading.value = false
-      isStreaming.value = false
     }
   }
 
