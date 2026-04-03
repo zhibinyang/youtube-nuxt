@@ -59,17 +59,34 @@ npm run build
 
 ## 部署到 Cloudflare Pages
 
-### 自动部署
+### 方式一：GitHub Actions 自动部署（推荐）
+每次push到main分支时自动构建部署，无需手动操作。
 
+#### 前置准备：
+1. Fork 本仓库到你的 GitHub 账户
+2. 在 Cloudflare 中创建 Pages 项目，记下项目名称
+3. 在 GitHub 仓库的 `Settings → Secrets and variables → Actions` 中添加以下3个Secret：
+   | Secret名称 | 说明 | 获取方式 |
+   |---|---|---|
+   | `GEMINI_API_KEY` | Google Gemini API密钥 | 在[Google AI Studio](https://ai.google.dev/)申请 |
+   | `CLOUDFLARE_API_TOKEN` | Cloudflare API令牌 | 在Cloudflare个人资料→API令牌中创建，需要`Cloudflare Pages:Edit`权限 |
+   | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare账户ID | 在Cloudflare主页右下角可以找到 |
+4. 修改`.github/workflows/deploy.yml`中的`projectName`为你在Cloudflare中创建的Pages项目名称
+
+#### 部署流程：
+配置完成后，每次push代码到main分支，GitHub Actions会自动执行：
+- 代码检出→依赖安装→项目构建→部署到Cloudflare Pages
+- 构建过程会自动注入`GEMINI_API_KEY`环境变量，无需手动配置
+
+### 方式二：Cloudflare Pages 自动构建
 1. Fork 本仓库到你的 GitHub
 2. 在 Cloudflare Pages 中选择该仓库
 3. 配置构建命令: `npm run build`
 4. 配置输出目录: `dist`
-5. 在环境变量中添加 `GEMINI_API_KEY`
-6. 部署完成即可访问
+5. 在 Cloudflare Pages 环境变量中添加 `GEMINI_API_KEY`
+6. 保存后会自动触发首次部署
 
-### 手动部署
-
+### 方式三：手动部署
 ```bash
 # 构建项目
 npm run build
@@ -77,6 +94,41 @@ npm run build
 # 部署到 Cloudflare Pages
 npx wrangler pages deploy dist
 ```
+
+## 💡 架构与精巧设计
+
+本项目在演进过程中，进行了一系列核心架构重构和极致的 UX 打磨：
+
+### 1. 纯组合式的模块化架构
+`index.vue` 作为一个纯编排层（不到 130 行），不包含任何业务与状态。所有的业务逻辑被彻底解耦到了各个专属的 Composables 中：
+- `useYoutubeAnalyzer`: 负责 API 交互、状态流转和剪贴板降级处理。
+- `useMarkdownProcessor`: 负责 Markdown 解析、TOC 树结构化提取与纯原生 DOM 交互（如标题折叠）。
+- `useScrollSync`: 结合 `IntersectionObserver` 思想，分离“用户主动滚动”与“程序化滚动”，实现精准的 TOC 高亮。
+
+### 2. 抵抗 LLM 疲劳的双段式架构 (Two-stage Generation)
+为了解决大模型一次性输出超长文本造成的“注意力下降/生成疲劳”问题，后端在 `gemini.ts` 中采用了精巧的两级架构：
+- **第一阶段（基于 [ID] 锚点的大纲提取）**：发送带有 `[ID]` 编号的完整原始字幕，要求 LLM 在不翻译原文的情况下，仅作结构探测。强声明 `responseMimeType: 'application/json'` 提取出包含 `start_id` 和 `end_id` 的边界坐标，以及主持人/嘉宾的真实姓名。
+- **第二阶段（动态提示词+串行填充）**：将第一阶段提取到的名字动态注入到细粒度的语义探针（Semantic Probes）提示词中。系统根据 `start_id` 和 `end_id` 切割切割字幕分片，为每一个节点发起**串行**的 LLM 填充请求。
+由于最终目标正是流式展现，我们刻意放弃了并发请求的暴力解法，用串行流式返回大幅降低了系统并发压力与 API 速率限制。
+
+### 3. 打字机级流式平滑器 (Stream Smoother)
+基于上述的**串行 LLM 设计**，前端必然面临“段落请求间隙”造成的断流停顿。我们为此设计了定制的 `useStreamSmoother`：
+- **衔接串行请求的 3 秒水位**：缓冲区的“3秒设计”并非随意设定，它正是为了弥补后端多个串行 LLM 请求之间的建立连接与首字返回时间 (TTFB)。当上一个段落流结束、下一个请求还在 pending 时，前端依靠缓冲区的 3 秒存量继续匀速吐字，完美掩盖了网络空档，让多个断裂的请求在用户视角下**融合成了一条连绵不断的完美文本流**。
+- **自适应调速**：动态监控缓冲区剩余容量，自适应调速。网络快则加速排空，网络慢则减速拉长，始终维持水位。
+- **rAF 逐帧渲染**：抛弃暴力的定时器，利用 `requestAnimationFrame` 将字符注入速度精准映射到屏幕帧率，做到像素级丝滑。
+
+### 4. 影视级的流式视觉体验
+- **阅读区渐变遮罩**：在流式输出处于活跃状态时，页面底部会浮现一层纯 CSS 实现的高度 144px 白色渐变遮罩。利用视觉欺骗，将底层字符“突然弹出”的生硬动作转化为优雅的浮出动画。
+- **平滑像素级跟随**：抛弃了传统的逐行 `scrollTo` 跳转，改为 rAF 下的 `lerp`（线性插值）。每帧移动剩余距离的 12%，滚动曲线先快后慢，流畅自然。
+
+### 4. 洞察用户意图的智能滚动跟随
+如何判断用户在流式输出中是否想去阅读上面的文字？
+通过监听 `wheel` 事件（纯粹的用户滚轮/触控板行为），而非简单的防抖 `scroll`（会被程序自身滚动触发）。一旦用户上滑，立即中断自动滚动；一旦用户翻回底部，自动恢复跟踪——完美区分程序行为与人类意图。
+
+### 5. 双形态响应式侧边目录
+充分考虑多设备阅读体验：
+- **宽屏 (Desktop)**：融入全局流式网格（CSS Grid / Flex），滚动时平滑悬浮。
+- **窄屏 (Mobile)**：智能退化为 Fixed 抽屉模式，配合 `Teleport` 的全屏半透明遮罩与过渡动画，点击遮罩即收起。外部汉堡按钮利用 `h-0` 零高度的 `sticky` 占位，开合之间确保主内容区“0 像素位移”。
 
 ## 项目结构
 
