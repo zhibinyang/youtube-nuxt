@@ -26,20 +26,13 @@ jobs:
 
       - name: 构建项目
         run: npm run build
-        env:
-          # 从GitHub Secrets获取Gemini API密钥
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        # 移除了无效的 GEMINI_API_KEY 环境变量配置
 
       - name: 部署到 Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
-          # Cloudflare API 令牌，需要 Pages 编辑权限
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          # Cloudflare 账户 ID
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Cloudflare Pages 项目名称，请修改为你自己的项目名
-          projectName: youtube-subtitles
-          # 构建产物目录
-          directory: dist
-          # 部署分支
+          projectName: youtube-subtitles # 确保这与你在 Cloudflare 创建的项目名一致
+          directory: .output/public      # ✅ 修复：Nuxt Cloudflare 预设的正确输出目录
           branch: main
