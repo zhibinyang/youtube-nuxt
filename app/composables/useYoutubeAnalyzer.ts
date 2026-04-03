@@ -53,8 +53,9 @@ export const useYoutubeAnalyzer = () => {
   }
 
   // 当 isStreaming 变化时自动控制滚动
-  watch(isStreaming, (streaming) => {
-    if (streaming && autoScroll.value) {
+  // 当 isStreaming 或 autoScroll 变化时自动控制平滑滚动
+  watch([isStreaming, autoScroll], ([streaming, scrolling]) => {
+    if (streaming && scrolling) {
       startSmoothScroll()
     }
   })
