@@ -46,6 +46,9 @@ async function handleSubmit() {
   activeTocId.value = ''
 
   try {
+    // 每次新分析开始时重置自动滚动状态
+    autoScroll.value = true
+
     const apiEndpoint = useMock.value ? '/api/mock-analyze' : '/api/analyze'
     const response = await fetch(apiEndpoint, {
       method: 'POST',
@@ -65,8 +68,9 @@ async function handleSubmit() {
       throw new Error('无法获取响应流')
     }
 
-    // 开始流式传输时自动折叠输入区
+    // 开始流式传输时自动折叠输入区并隐藏骨架屏
     inputCollapsed.value = true
+    loading.value = false
 
     while (true) {
       const { done, value } = await reader.read()
@@ -77,6 +81,16 @@ async function handleSubmit() {
 
       // 更新目录
       updateTocFromMarkdown()
+
+      // 自动滚动到底部
+      if (autoScroll.value) {
+        isProgrammaticScroll.value = true
+        // 流式输出时使用即时滚动，避免平滑滚动的节流导致跟不上速度
+        window.scrollTo({
+          top: document.documentElement.scrollHeight,
+          behavior: 'auto'
+        })
+      }
     }
   } catch (e) {
     error.value = e instanceof Error ? e.message : '发生未知错误'
@@ -197,6 +211,11 @@ watch(() => content.value, async () => {
 
 /** 监听滚动，更新当前激活的目录项 */
 function handleScroll() {
+  if (isProgrammaticScroll.value) {
+    isProgrammaticScroll.value = false
+    return
+  }
+
   if (!contentRef.value || toc.value.length === 0) return
 
   const headings = contentRef.value.querySelectorAll('h1, h2, h3, h4, h5, h6')
@@ -210,6 +229,16 @@ function handleScroll() {
       activeTocId.value = heading.id
       break
     }
+  }
+
+  // 检测用户是否手动滚动
+  const scrollTop = window.scrollY
+  const windowHeight = window.innerHeight
+  const documentHeight = document.documentElement.scrollHeight
+  if (scrollTop + windowHeight >= documentHeight - 50) {
+    autoScroll.value = true
+  } else if (scrollTop + windowHeight < documentHeight - 100) {
+    autoScroll.value = false
   }
 }
 
@@ -253,6 +282,11 @@ function toggleContentHeading(item: TocItem) {
 
 /** 输入区域折叠状态 */
 const inputCollapsed = ref(false)
+
+/** 自动滚动开关 */
+const autoScroll = ref(true)
+/** 标记是否是程序自动滚动，避免触发用户滚动检测 */
+const isProgrammaticScroll = ref(false)
 
 /** 切换输入区域折叠 */
 function toggleInputCollapse() {
@@ -464,6 +498,40 @@ onUnmounted(() => {
           {{ error }}
         </div>
 
+        <!-- 骨架加载 -->
+        <div v-if="loading" class="max-w-3xl mx-auto animate-pulse">
+          <!-- 标题骨架 -->
+          <div class="h-10 bg-slate-200 rounded w-3/4 mb-8"></div>
+
+          <!-- 段落骨架 -->
+          <div class="space-y-3 mb-10">
+            <div class="h-4 bg-slate-200 rounded w-full"></div>
+            <div class="h-4 bg-slate-200 rounded w-11/12"></div>
+            <div class="h-4 bg-slate-200 rounded w-4/5"></div>
+          </div>
+
+          <!-- 二级标题骨架 -->
+          <div class="h-7 bg-slate-200 rounded w-1/2 mb-4"></div>
+
+          <!-- 段落骨架 -->
+          <div class="space-y-3 mb-10">
+            <div class="h-4 bg-slate-200 rounded w-full"></div>
+            <div class="h-4 bg-slate-200 rounded w-5/6"></div>
+            <div class="h-4 bg-slate-200 rounded w-3/4"></div>
+            <div class="h-4 bg-slate-200 rounded w-2/3"></div>
+          </div>
+
+          <!-- 二级标题骨架 -->
+          <div class="h-7 bg-slate-200 rounded w-2/5 mb-4"></div>
+
+          <!-- 段落骨架 -->
+          <div class="space-y-3">
+            <div class="h-4 bg-slate-200 rounded w-full"></div>
+            <div class="h-4 bg-slate-200 rounded w-9/10"></div>
+            <div class="h-4 bg-slate-200 rounded w-5/6"></div>
+          </div>
+        </div>
+
         <!-- AI 输出内容 -->
         <div
           v-if="content"
@@ -513,6 +581,11 @@ onUnmounted(() => {
 </template>
 
 <style>
+/* 全局滚动条预留空间，避免滚动条出现时内容左移 */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* 自定义滚动条样式 */
 ::-webkit-scrollbar {
   width: 6px;
