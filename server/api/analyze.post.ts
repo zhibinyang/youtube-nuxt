@@ -25,6 +25,18 @@ interface Outline {
 }
 
 export default defineEventHandler(async (event) => {
+  // 认证校验
+  const expectedApiKey = process.env.BACKEND_API_KEY
+  if (expectedApiKey) {
+    const requestApiKey = getHeader(event, 'X-API-Key')
+    if (!requestApiKey || requestApiKey !== expectedApiKey) {
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Unauthorized: Invalid or missing API key'
+      })
+    }
+  }
+
   // 1. 解析请求体
   const body = await readBody<AnalyzeRequest>(event)
 

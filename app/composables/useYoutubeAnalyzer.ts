@@ -7,6 +7,28 @@ export const useYoutubeAnalyzer = () => {
   const url = ref('')
   /** 调试模式 - 使用 mock 接口 */
   const useMock = ref(false)
+  /** API 认证密钥 */
+  const apiKey = ref<string | null>(null)
+
+  // 页面加载时处理 URL 中的认证密钥
+  onMounted(() => {
+    if (process.client) {
+      const urlParams = new URLSearchParams(window.location.search)
+      const key = urlParams.get('key')
+      if (key) {
+        // 存到 sessionStorage
+        sessionStorage.setItem('api_key', key)
+        apiKey.value = key
+        // 从 URL 中删除 key 参数，不刷新页面
+        urlParams.delete('key')
+        const newUrl = `${window.location.pathname}${urlParams.toString() ? `?${urlParams.toString()}` : ''}`
+        window.history.replaceState({}, document.title, newUrl)
+      } else {
+        // 从 sessionStorage 读取
+        apiKey.value = sessionStorage.getItem('api_key')
+      }
+    }
+  })
   /** 生成的 Markdown 内容（由 smoother 逐字写入） */
   const content = ref('')
   /** 加载状态（骨架屏） */
@@ -72,9 +94,14 @@ export const useYoutubeAnalyzer = () => {
 
     try {
       const apiEndpoint = useMock.value ? '/api/mock-analyze' : '/api/analyze'
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      // 非 mock 请求带上认证头
+      if (!useMock.value && apiKey.value) {
+        headers['X-API-Key'] = apiKey.value
+      }
       const response = await fetch(apiEndpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ url: url.value.trim() })
       })
 

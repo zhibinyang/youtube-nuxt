@@ -33,13 +33,17 @@ npm install
 
 ### 2. 配置环境变量
 
-复制 `.env.example` 为 `.env` 并填入你的 Gemini API Key:
+复制 `.env.example` 为 `.env` 并填入配置:
 
 ```env
+# 必填：Google Gemini API Key
 GEMINI_API_KEY=your_api_key_here
+# 可选：API认证密钥，设置后可保护接口不被滥用
+BACKEND_API_KEY=your_custom_secret_key
 ```
 
 > Gemini API Key 可以在 [Google AI Studio](https://ai.google.dev/) 免费申请。
+> 设置`BACKEND_API_KEY`后，访问需要带上密钥参数：`https://你的域名?key=your_custom_secret_key`，第一次访问后会自动存在浏览器会话中。
 
 ### 3. 启动开发服务器
 
@@ -59,34 +63,15 @@ npm run build
 
 ## 部署到 Cloudflare Pages
 
-### 方式一：GitHub Actions 自动部署（推荐）
-每次push到main分支时自动构建部署，无需手动操作。
-
-#### 前置准备：
-1. Fork 本仓库到你的 GitHub 账户
-2. 在 Cloudflare 中创建 Pages 项目，记下项目名称
-3. 在 GitHub 仓库的 `Settings → Secrets and variables → Actions` 中添加以下3个Secret：
-   | Secret名称 | 说明 | 获取方式 |
-   |---|---|---|
-   | `GEMINI_API_KEY` | Google Gemini API密钥 | 在[Google AI Studio](https://ai.google.dev/)申请 |
-   | `CLOUDFLARE_API_TOKEN` | Cloudflare API令牌 | 在Cloudflare个人资料→API令牌中创建，需要`Cloudflare Pages:Edit`权限 |
-   | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare账户ID | 在Cloudflare主页右下角可以找到 |
-4. 修改`.github/workflows/deploy.yml`中的`projectName`为你在Cloudflare中创建的Pages项目名称
-
-#### 部署流程：
-配置完成后，每次push代码到main分支，GitHub Actions会自动执行：
-- 代码检出→依赖安装→项目构建→部署到Cloudflare Pages
-- 构建过程会自动注入`GEMINI_API_KEY`环境变量，无需手动配置
-
-### 方式二：Cloudflare Pages 自动构建
+### 方式一：Cloudflare Pages 自动构建（推荐）
 1. Fork 本仓库到你的 GitHub
 2. 在 Cloudflare Pages 中选择该仓库
 3. 配置构建命令: `npm run build`
 4. 配置输出目录: `dist`
-5. 在 Cloudflare Pages 环境变量中添加 `GEMINI_API_KEY`
-6. 保存后会自动触发首次部署
+5. 在 Cloudflare Pages 环境变量中添加 `GEMINI_API_KEY`（必填）和 `BACKEND_API_KEY`（可选）
+6. 保存后会自动触发首次部署，后续push代码会自动构建更新
 
-### 方式三：手动部署
+### 方式二：手动部署
 ```bash
 # 构建项目
 npm run build
